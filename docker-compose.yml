@@ -1,0 +1,44 @@
+version: "3.5"
+
+services:
+  keycloak:
+    image: quay.io/keycloak/keycloak:latest
+    environment:
+      - "KEYCLOAK_ADMIN=admin"
+      - "KEYCLOAK_ADMIN_PASSWORD=change_me"
+    command: "start-dev --import-realm"
+    volumes:
+      - "./keycloak-export:/opt/keycloak/data/import/"
+    ports:
+      - "8080:8080"
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8080/realms/realm/.well-known/openid-configuration"]
+
+  oauth2-proxy:
+    image: quay.io/oauth2-proxy/oauth2-proxy:v7.3.0
+    command: >-
+      --provider=keycloak-oidc
+      --client-id=testclient
+      --client-secret=qzxoaevjloqHQ2ft0BVXdNgkycnivJhi
+      --cookie-secret=9EugQyzpiya6njv9VGFgvUTjUTT8wOlKeB0ORj3wzlM=
+      --redirect-url=https://localhost:4190/oauth2/callback
+      --oidc-issuer-url=http://keycloak:8080/realms/realm
+      --set-xauthrequest
+      --email-domain=*
+      --http-address=0.0.0.0:4180
+      --https-address=0.0.0.0:4190
+      --upstream=http://upstream
+      --tls-cert-file=/cert.pem
+      --tls-key-file=/key.pem
+    volumes:
+      - "./cert.pem:/cert.pem"
+      - "./key.pem:/key.pem"
+    ports:
+      - "4180:4180"
+      - "4190:4190"
+    depends_on:
+      keycloak:
+        condition: service_healthy
+  
+  upstream:
+    image: kennethreitz/httpbin:latest
